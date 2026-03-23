@@ -1,0 +1,66 @@
+name: globus-connect-personal
+version: "1.0.0"
+description: "Installs Globus Connect Personal and registers a data transfer endpoint."
+
+config:
+  endpoint_name:
+    required: true
+    type: string
+
+conditions:
+  local:
+    - type: command
+      run: which globus
+      message: "globus CLI is required: pip install globus-cli"
+    - type: command
+      run: globus whoami
+      message: "not logged in to Globus: run 'globus login' first"
+  remote:
+    - type: platform
+      os: linux
+      message: "Globus Connect Personal plugin requires Linux"
+
+local:
+  provision:
+    - type: run
+      run: globus endpoint create --personal {{ config.endpoint_name }} --format json
+      capture:
+        setup_key: ".setup_key"
+        endpoint_id: ".id"
+    - type: push
+      key: setup_key
+      value: "{{ outputs.setup_key }}"
+
+remote:
+  install:
+    - type: fetch
+      url: https://downloads.globus.org/globus-connect-personal/linux/stable/globusconnectpersonal-latest.tgz
+      dest: /tmp/globusconnectpersonal-latest.tgz
+    - type: extract
+      src: /tmp/globusconnectpersonal-latest.tgz
+      dest: /opt/
+    - type: run
+      run: |
+        latest=$(ls -d /opt/globusconnectpersonal-*/ 2>/dev/null | sort -V | tail -1)
+        [ -n "$latest" ] && ln -sfn "$latest" /opt/globusconnectpersonal
+
+  configure:
+    - type: run
+      run: |
+        /opt/globusconnectpersonal/globusconnectpersonal \
+          -setup {{ pushed.setup_key }}
+
+  start:
+    - type: run
+      background: true
+      run: /opt/globusconnectpersonal/globusconnectpersonal -start
+
+  stop:
+    - type: run
+      run: /opt/globusconnectpersonal/globusconnectpersonal -stop 2>/dev/null || true
+
+  health:
+    interval: 1m
+    steps:
+      - type: run
+        run: pgrep -f globusconnectpersonal
