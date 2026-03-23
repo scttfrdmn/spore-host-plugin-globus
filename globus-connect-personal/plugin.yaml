@@ -1,5 +1,5 @@
 name: globus-connect-personal
-version: "1.0.0"
+version: "0.1.0"
 description: "Installs Globus Connect Personal and registers a data transfer endpoint."
 
 config:
